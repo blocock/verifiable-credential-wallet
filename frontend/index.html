@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifiable Credential Wallet</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Verifiable Credential Wallet</h1>
+            <p class="subtitle">Manage your digital credentials</p>
+        </header>
+
+        <main>
+            <!-- Issue Credential Section -->
+            <section class="card">
+                <h2>Issue New Credential</h2>
+                <form id="issueForm">
+                    <div class="form-group">
+                        <label for="credentialType">Credential Type:</label>
+                        <input type="text" id="credentialType" placeholder="e.g., Gym Membership Card" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="claimsJson">Claims (JSON):</label>
+                        <textarea id="claimsJson" rows="4" placeholder='{"name": "John Doe", "membershipId": "12345", "expiryDate": "2025-12-31"}' required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Issue Credential</button>
+                </form>
+            </section>
+
+            <!-- Credentials List Section -->
+            <section class="card">
+                <h2>My Credentials</h2>
+                <div id="credentialsList" class="credentials-list">
+                    <p class="empty-state">No credentials yet. Issue your first credential above!</p>
+                </div>
+            </section>
+
+            <!-- Verify Credential Section -->
+            <section class="card">
+                <h2>Verify Credential</h2>
+                <form id="verifyForm">
+                    <div class="form-group">
+                        <label for="verifyJson">Credential JSON:</label>
+                        <textarea id="verifyJson" rows="6" placeholder="Paste credential JSON here..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-secondary">Verify Credential</button>
+                </form>
+                <div id="verifyResult" class="verify-result"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for Credential Details -->
+    <div id="credentialModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('credentialModal')">&times;</span>
+            <h2>Credential Details</h2>
+            <div id="credentialDetails"></div>
+        </div>
+    </div>
+
+    <!-- Modal for Share Credential -->
+    <div id="shareModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('shareModal')">&times;</span>
+            <h2>Share Credential</h2>
+            <div id="shareContent">
+                <p>Choose how you want to share this credential:</p>
+                <div class="share-options">
+                    <button class="btn btn-primary" onclick="copyShareJson()">
+                        📋 Copy JSON
+                    </button>
+                    <button class="btn btn-secondary" onclick="copyShareUrl()">
+                        🔗 Copy Shareable Link
+                    </button>
+                </div>
+                <div class="share-preview">
+                    <h4>Shareable Link:</h4>
+                    <div id="shareUrlDisplay" class="url-display"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+

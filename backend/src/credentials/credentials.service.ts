@@ -1,0 +1,148 @@
+import { Injectable } from '@nestjs/common';
+import { v4 as uuidv4 } from 'uuid';
+import { Credential } from './interfaces/credential.interface';
+import { IssueCredentialDto } from './dto/issue-credential.dto';
+import { KeyManagementService } from './key-management.service';
+import { JsonCanonicalizer } from '../common/utils/json-canonicalizer.util';
+
+@Injectable()
+export class CredentialsService {
+  private credentials: Map<string, Credential> = new Map();
+
+  constructor(private readonly keyManagement: KeyManagementService) {}
+
+  /**
+   * Issue a new verifiable credential
+   */
+  issueCredential(dto: IssueCredentialDto): Credential {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    
+    // Create the credential payload
+    const credentialData = {
+      id,
+      type: dto.type,
+      claims: dto.claims,
+      issuer: 'self',
+      issuedAt: now,
+    };
+
+    // Sign the credential payload
+    const signature = this.signCredentialData(credentialData);
+
+    // Create the complete credential with proof
+    const credential: Credential = {
+      ...credentialData,
+      proof: {
+        type: 'RsaSignature2018',
+        created: now,
+        proofPurpose: 'assertionMethod',
+        verificationMethod: 'did:web:localhost:3000#key-1',
+        signatureValue: signature,
+      },
+    };
+
+    // Store the credential
+    this.credentials.set(id, credential);
+
+    return credential;
+  }
+
+  /**
+   * List all credentials
+   */
+  findAll(): Credential[] {
+    return Array.from(this.credentials.values());
+  }
+
+  /**
+   * Find a credential by ID
+   */
+  findOne(id: string): Credential | undefined {
+    return this.credentials.get(id);
+  }
+
+  /**
+   * Verify a credential's signature
+   */
+  verifyCredential(credential: any): { valid: boolean; error?: string } {
+    try {
+      // Check if credential has required fields
+      if (!credential.id || !credential.proof || !credential.proof.signatureValue) {
+        return { valid: false, error: 'Credential missing required fields' };
+      }
+
+      // Recreate the signed payload
+      const payload = this.createCredentialPayload(credential);
+      console.log('payload', payload);
+      
+      // Verify the signature
+      const isValid = this.verifySignature(payload, credential.proof.signatureValue);
+
+      if (!isValid) {
+        return { valid: false, error: 'Invalid signature' };
+      }
+
+      // Check if credential exists in wallet (optional check)
+      const storedCredential = this.credentials.get(credential.id);
+      if (storedCredential) {
+        // Verify it matches the stored version
+        const storedPayload = this.createCredentialPayload(storedCredential);
+        if (storedPayload !== payload) {
+          return { valid: false, error: 'Credential has been tampered with' };
+        }
+      }
+
+      return { valid: true };
+    } catch (error) {
+      return { valid: false, error: `Verification failed: ${error.message}` };
+    }
+  }
+
+  /**
+   * Delete a credential
+   */
+  remove(id: string): boolean {
+    return this.credentials.delete(id);
+  }
+
+  /**
+   * Sign a credential using RSA-SHA256
+   */
+  private signCredentialData(credentialData: {
+    id: string;
+    type: string;
+    claims: Record<string, any>;
+    issuer: string;
+    issuedAt: string;
+  }): string {
+    const payload = this.createCredentialPayload(credentialData);
+    return this.keyManagement.sign(payload);
+  }
+
+  /**
+   * Verify a signature using RSA-SHA256
+   */
+  private verifySignature(payload: string, signature: string): boolean {
+    return this.keyManagement.verify(payload, signature);
+  }
+
+  /**
+   * Create a canonical payload for signing/verification
+   * Recursively sorts all object keys to ensure consistent JSON representation
+   */
+  private createCredentialPayload(credential: any): string {
+    // Extract credential data (excluding proof)
+    const credentialData = {
+      id: credential.id,
+      type: credential.type,
+      claims: credential.claims,
+      issuer: credential.issuer,
+      issuedAt: credential.issuedAt,
+    };
+    
+    // Create canonical JSON string with recursively sorted keys
+    return JsonCanonicalizer.toCanonicalString(credentialData);
+  }
+}
+
