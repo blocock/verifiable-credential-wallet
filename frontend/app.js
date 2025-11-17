@@ -153,6 +153,7 @@ async function viewCredential(id) {
         }
         
         const detailsDiv = document.getElementById('credentialDetails');
+        const credentialJson = JSON.stringify(credential, null, 2);
         detailsDiv.innerHTML = `
             <h3>${escapeHtml(credential.type)}</h3>
             <p><strong>ID:</strong> ${credential.id}</p>
@@ -162,8 +163,13 @@ async function viewCredential(id) {
             <div class="json-display">${JSON.stringify(credential.claims, null, 2)}</div>
             <h4>Full Credential JSON:</h4>
             <div class="json-display">${JSON.stringify(credential, null, 2)}</div>
-            <button class="btn copy-btn" onclick="copyCredentialToClipboard(${JSON.stringify(JSON.stringify(credential, null, 2))})">Copy JSON</button>
+            <button class="btn copy-btn" id="copyCredentialBtn">Copy JSON</button>
         `;
+        
+        // Attach event listener to the copy button
+        document.getElementById('copyCredentialBtn').addEventListener('click', () => {
+            copyToClipboard(credentialJson);
+        });
         
         document.getElementById('credentialModal').style.display = 'block';
         
@@ -249,25 +255,24 @@ async function deleteCredential(id) {
 // Copy to clipboard
 async function copyToClipboard(text) {
     try {
-        await navigator.clipboard.writeText(text);
-        alert('Copied to clipboard!');
+        // Use modern Clipboard API (supported in all modern browsers)
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            alert('Copied to clipboard!');
+            return;
+        }
     } catch (error) {
-        // Fallback for older browsers
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        alert('Copied to clipboard!');
+        console.warn('Clipboard API failed:', error);
     }
-}
-
-// Copy credential to clipboard (wrapper for onclick)
-function copyCredentialToClipboard(jsonString) {
-    copyToClipboard(jsonString);
+    
+    const userConfirmed = confirm(
+        'Automatic copy failed. Please copy the text manually.\n\n' +
+        'Click OK to see the text in a prompt, then copy it.'
+    );
+    
+    if (userConfirmed) {
+        prompt('Copy this text:', text);
+    }
 }
 
 // Close modal
