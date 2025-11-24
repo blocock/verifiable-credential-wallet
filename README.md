@@ -170,3 +170,17 @@ The application uses proper RSA key management:
   - Keys are never committed to version control (excluded in `.gitignore`)
 - **Signing Algorithm**: RSA-SHA256 for credential signing and verification
 
+## DID:web Integration
+
+The application fully implements DID:web resolution for credential verification:
+
+- **DID Generation**: Automatically generates `did:web` identifiers based on the server URL
+- **DID Resolution**: Credentials include resolvable DID:web identifiers in their `proof.verificationMethod`
+- **Verification Process**: 
+  - When verifying a credential, the system resolves the DID from the credential's `verificationMethod`
+  - Extracts the public key from the resolved DID document
+  - Uses the resolved public key to verify the credential signature
+  - This enables decentralized verification - credentials can be verified by resolving the issuer's DID
+- **DID Document Endpoint**: Available at `/.well-known/did.json` following W3C DID:web specification
+- **Cross-issuer Verification**: The system can verify credentials from any issuer by resolving their DID:web identifier
+

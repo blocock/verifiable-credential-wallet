@@ -71,20 +71,38 @@ export class CredentialsService {
   }
 
   /**
-   * Verify a credential's signature
+   * Verify a credential's signature using DID resolution
    */
-  verifyCredential(credential: any): { valid: boolean; error?: string } {
+  async verifyCredential(credential: any): Promise<{ valid: boolean; error?: string }> {
     try {
       // Check if credential has required fields
       if (!credential.id || !credential.proof || !credential.proof.signatureValue) {
         return { valid: false, error: 'Credential missing required fields' };
       }
 
+      // Check if verificationMethod exists
+      if (!credential.proof.verificationMethod) {
+        return { valid: false, error: 'Credential missing verificationMethod in proof' };
+      }
+
+      // Resolve DID and get verification method
+      const verificationMethod = await this.didService.getVerificationMethod(
+        credential.proof.verificationMethod,
+      );
+
+      if (!verificationMethod) {
+        return { valid: false, error: 'Failed to resolve DID or verification method not found' };
+      }
+
       // Recreate the signed payload
       const payload = this.createCredentialPayload(credential);
       
-      // Verify the signature
-      const isValid = this.verifySignature(payload, credential.proof.signatureValue);
+      // Verify the signature using the public key from DID document
+      const isValid = await this.verifySignatureWithPublicKey(
+        payload,
+        credential.proof.signatureValue,
+        verificationMethod.publicKeyPem,
+      );
 
       if (!isValid) {
         return { valid: false, error: 'Invalid signature' };
@@ -128,10 +146,24 @@ export class CredentialsService {
   }
 
   /**
-   * Verify a signature using RSA-SHA256
+   * Verify a signature using RSA-SHA256 with a specific public key
    */
-  private verifySignature(payload: string, signature: string): boolean {
-    return this.keyManagement.verify(payload, signature);
+  private async verifySignatureWithPublicKey(
+    payload: string,
+    signature: string,
+    publicKeyPem: string,
+  ): Promise<boolean> {
+    try {
+      const crypto = require('crypto');
+      const publicKey = crypto.createPublicKey(publicKeyPem);
+      const verify = crypto.createVerify('RSA-SHA256');
+      verify.update(payload);
+      verify.end();
+      return verify.verify(publicKey, signature, 'base64');
+    } catch (error) {
+      console.error('Error verifying signature with public key:', error);
+      return false;
+    }
   }
 
   /**

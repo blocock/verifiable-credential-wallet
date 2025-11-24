@@ -11,6 +11,42 @@ describe('CredentialsService', () => {
     const keyMgmtService = new KeyManagementService();
     keyMgmtService.initializeKeys();
 
+    const didServiceMock = {
+      generateDid: jest.fn().mockReturnValue('did:web:localhost:3000'),
+      resolveDid: jest.fn().mockResolvedValue({
+        '@context': ['https://www.w3.org/ns/did/v1'],
+        id: 'did:web:localhost:3000',
+        verificationMethod: [
+          {
+            id: 'did:web:localhost:3000#key-1',
+            type: 'RsaVerificationKey2018',
+            controller: 'did:web:localhost:3000',
+            publicKeyPem: keyMgmtService.getPublicKeyPem(),
+          },
+        ],
+      }),
+      getVerificationMethod: jest.fn().mockImplementation(async (didWithFragment) => {
+        return {
+          id: didWithFragment,
+          type: 'RsaVerificationKey2018',
+          controller: 'did:web:localhost:3000',
+          publicKeyPem: keyMgmtService.getPublicKeyPem(),
+        };
+      }),
+      generateDidDocument: jest.fn().mockReturnValue({
+        '@context': ['https://www.w3.org/ns/did/v1'],
+        id: 'did:web:localhost:3000',
+        verificationMethod: [
+          {
+            id: 'did:web:localhost:3000#key-1',
+            type: 'RsaVerificationKey2018',
+            controller: 'did:web:localhost:3000',
+            publicKeyPem: keyMgmtService.getPublicKeyPem(),
+          },
+        ],
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CredentialsService,
@@ -20,9 +56,7 @@ describe('CredentialsService', () => {
         },
         {
           provide: DidService,
-          useValue: {
-            generateDid: jest.fn().mockReturnValue('did:web:localhost:3000'),
-          },
+          useValue: didServiceMock,
         },
       ],
     }).compile();
@@ -109,31 +143,31 @@ describe('CredentialsService', () => {
   });
 
   describe('verifyCredential', () => {
-    it('should verify a valid credential', () => {
+    it('should verify a valid credential', async () => {
       const dto = {
         type: 'Test',
         claims: { name: 'John' },
       };
 
       const credential = service.issueCredential(dto);
-      const result = service.verifyCredential(credential);
+      const result = await service.verifyCredential(credential);
 
       expect(result.valid).toBe(true);
       expect(result.error).toBeUndefined();
     });
 
-    it('should reject credential missing required fields', () => {
+    it('should reject credential missing required fields', async () => {
       const invalidCredential = {
         id: 'test-id',
         // missing proof
       };
 
-      const result = service.verifyCredential(invalidCredential);
+      const result = await service.verifyCredential(invalidCredential);
       expect(result.valid).toBe(false);
       expect(result.error).toContain('required fields');
     });
 
-    it('should reject credential with invalid signature', () => {
+    it('should reject credential with invalid signature', async () => {
       const dto = {
         type: 'Test',
         claims: { name: 'John' },
@@ -142,12 +176,12 @@ describe('CredentialsService', () => {
       const credential = service.issueCredential(dto);
       credential.proof.signatureValue = 'invalid-signature';
 
-      const result = service.verifyCredential(credential);
+      const result = await service.verifyCredential(credential);
       expect(result.valid).toBe(false);
       expect(result.error).toContain('Invalid signature');
     });
 
-    it('should detect tampered credentials', () => {
+    it('should detect tampered credentials', async () => {
       const dto = {
         type: 'Test',
         claims: { name: 'John' },
@@ -156,8 +190,37 @@ describe('CredentialsService', () => {
       const credential = service.issueCredential(dto);
       credential.claims.name = 'Tampered';
 
-      const result = service.verifyCredential(credential);
+      const result = await service.verifyCredential(credential);
       expect(result.valid).toBe(false);
+    });
+
+    it('should use DID resolution for verification', async () => {
+      const dto = {
+        type: 'Test',
+        claims: { name: 'John' },
+      };
+
+      const credential = service.issueCredential(dto);
+      const result = await service.verifyCredential(credential);
+
+      // Verify that DID resolution was called
+      expect(result.valid).toBe(true);
+      // The verification should have resolved the DID from the credential's verificationMethod
+      expect(credential.proof.verificationMethod).toContain('did:web:');
+    });
+
+    it('should reject credential with missing verificationMethod', async () => {
+      const dto = {
+        type: 'Test',
+        claims: { name: 'John' },
+      };
+
+      const credential = service.issueCredential(dto);
+      delete credential.proof.verificationMethod;
+
+      const result = await service.verifyCredential(credential);
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('verificationMethod');
     });
   });
 

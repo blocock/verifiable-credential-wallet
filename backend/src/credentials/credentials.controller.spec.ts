@@ -13,6 +13,42 @@ describe('CredentialsController', () => {
     // Initialize keys for testing
     keyManagementService.initializeKeys();
 
+    const didServiceMock = {
+      generateDid: jest.fn().mockReturnValue('did:web:localhost:3000'),
+      resolveDid: jest.fn().mockResolvedValue({
+        '@context': ['https://www.w3.org/ns/did/v1'],
+        id: 'did:web:localhost:3000',
+        verificationMethod: [
+          {
+            id: 'did:web:localhost:3000#key-1',
+            type: 'RsaVerificationKey2018',
+            controller: 'did:web:localhost:3000',
+            publicKeyPem: keyManagementService.getPublicKeyPem(),
+          },
+        ],
+      }),
+      getVerificationMethod: jest.fn().mockImplementation(async (didWithFragment) => {
+        return {
+          id: didWithFragment,
+          type: 'RsaVerificationKey2018',
+          controller: 'did:web:localhost:3000',
+          publicKeyPem: keyManagementService.getPublicKeyPem(),
+        };
+      }),
+      generateDidDocument: jest.fn().mockReturnValue({
+        '@context': ['https://www.w3.org/ns/did/v1'],
+        id: 'did:web:localhost:3000',
+        verificationMethod: [
+          {
+            id: 'did:web:localhost:3000#key-1',
+            type: 'RsaVerificationKey2018',
+            controller: 'did:web:localhost:3000',
+            publicKeyPem: keyManagementService.getPublicKeyPem(),
+          },
+        ],
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CredentialsController],
       providers: [
@@ -23,9 +59,7 @@ describe('CredentialsController', () => {
         },
         {
           provide: DidService,
-          useValue: {
-            generateDid: jest.fn().mockReturnValue('did:web:localhost:3000'),
-          },
+          useValue: didServiceMock,
         },
       ],
     }).compile();
@@ -82,10 +116,10 @@ describe('CredentialsController', () => {
   });
 
   describe('POST /credentials/verify', () => {
-    it('should verify a valid credential', () => {
+    it('should verify a valid credential', async () => {
       const dto = { type: 'Test', claims: { name: 'John' } };
       const credential = controller.issueCredential(dto);
-      const result = controller.verifyCredential({ credential });
+      const result = await controller.verifyCredential({ credential });
 
       expect(result.valid).toBe(true);
     });

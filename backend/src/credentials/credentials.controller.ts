@@ -38,8 +38,8 @@ export class CredentialsController {
 
   @Post('verify')
   @HttpCode(HttpStatus.OK)
-  verifyCredential(@Body() dto: VerifyCredentialDto) {
-    return this.credentialsService.verifyCredential(dto.credential);
+  async verifyCredential(@Body() dto: VerifyCredentialDto) {
+    return await this.credentialsService.verifyCredential(dto.credential);
   }
 
   @Delete(':id')
