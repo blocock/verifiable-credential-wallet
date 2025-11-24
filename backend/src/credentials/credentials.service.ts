@@ -4,12 +4,16 @@ import { Credential } from './interfaces/credential.interface';
 import { IssueCredentialDto } from './dto/issue-credential.dto';
 import { KeyManagementService } from './key-management.service';
 import { JsonCanonicalizer } from '../common/utils/json-canonicalizer.util';
+import { DidService } from '../did/did.service';
 
 @Injectable()
 export class CredentialsService {
   private credentials: Map<string, Credential> = new Map();
 
-  constructor(private readonly keyManagement: KeyManagementService) {}
+  constructor(
+    private readonly keyManagement: KeyManagementService,
+    private readonly didService: DidService,
+  ) {}
 
   /**
    * Issue a new verifiable credential
@@ -30,6 +34,10 @@ export class CredentialsService {
     // Sign the credential payload
     const signature = this.signCredentialData(credentialData);
 
+    // Get DID for verification method
+    const did = this.didService.generateDid();
+    const verificationMethod = `${did}#key-1`;
+
     // Create the complete credential with proof
     const credential: Credential = {
       ...credentialData,
@@ -37,7 +45,7 @@ export class CredentialsService {
         type: 'RsaSignature2018',
         created: now,
         proofPurpose: 'assertionMethod',
-        verificationMethod: 'did:web:localhost:3000#key-1',
+        verificationMethod: verificationMethod,
         signatureValue: signature,
       },
     };
@@ -74,7 +82,6 @@ export class CredentialsService {
 
       // Recreate the signed payload
       const payload = this.createCredentialPayload(credential);
-      console.log('payload', payload);
       
       // Verify the signature
       const isValid = this.verifySignature(payload, credential.proof.signatureValue);

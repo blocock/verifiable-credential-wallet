@@ -30,8 +30,9 @@ export class KeyManagementService implements OnModuleInit {
 
   /**
    * Initialize keys - load from file or generate new ones
+   * Made public for testing purposes
    */
-  private initializeKeys(): void {
+  initializeKeys(): void {
     try {
       if (this.loadKeysFromFile()) {
         console.log('Keys loaded from file');
